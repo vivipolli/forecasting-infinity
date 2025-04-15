@@ -1,0 +1,49 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@font-face {
+  font-family: 'Ciutadella';
+  src: url('./assets/EMT_Ciutadella_TRIAL/CiutadellaTRIAL-Rg.otf') format('opentype');
+  font-weight: normal;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'Ciutadella';
+  src: url('./assets/EMT_Ciutadella_TRIAL/CiutadellaTRIAL-Bd.otf') format('opentype');
+  font-weight: bold;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'Ciutadella';
+  src: url('./assets/EMT_Ciutadella_TRIAL/CiutadellaTRIAL-It.otf') format('opentype');
+  font-weight: normal;
+  font-style: italic;
+}
+
+@layer base {
+  html {
+    -moz-osx-font-smoothing: grayscale;
+    -webkit-font-smoothing: antialiased;
+    font-family: 'Ciutadella', sans-serif;
+  }
+
+  @keyframes slide {
+    100% {
+      background-position: 50px 0, 125px 25px;
+    }
+  }
+
+  main {
+    @apply px-4 min-h-screen sm:px-0 space-y-16 w-full bg-white;
+    background-image: radial-gradient(hsla(0, 0%, 0%, 0.25) 1px,
+        transparent 0),
+      radial-gradient(hsla(0, 0%, 0%, 0.1) 1px, transparent 0);
+    background-size: 50px 50px;
+    background-position: 0 0, 25px 25px;
+    -webkit-animation: slide 2s linear infinite;
+    animation: slide 4s linear infinite;
+  }
+}
