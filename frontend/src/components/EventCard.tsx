@@ -8,7 +8,7 @@ interface EventCardProps {
   context?: string;
   category?: string;
   expertValidations: number;
-  onFeedback: (agrees: boolean) => void;
+  onFeedback: (eventId: string, agrees: boolean) => void;
 }
 
 export const EventCard: React.FC<EventCardProps> = ({
@@ -22,6 +22,7 @@ export const EventCard: React.FC<EventCardProps> = ({
 }) => {
   const { expertVerification } = useExpert();
   const [showModal, setShowModal] = useState(false);
+  const [showFeedbackModal, setShowFeedbackModal] = useState(false);
   const [selectedFeedback, setSelectedFeedback] = useState<boolean | null>(null);
   const probabilityColor = probability >= 0.5 
     ? 'text-primary' 
@@ -29,13 +30,13 @@ export const EventCard: React.FC<EventCardProps> = ({
 
   const handleFeedbackClick = (agrees: boolean) => {
     setSelectedFeedback(agrees);
-    setShowModal(true);
+    setShowFeedbackModal(true);
   };
 
   const handleConfirm = () => {
     if (selectedFeedback !== null) {
-      onFeedback(selectedFeedback);
-      setShowModal(false);
+      onFeedback(eventId, selectedFeedback);
+      setShowFeedbackModal(false);
     }
   };
 
@@ -54,7 +55,15 @@ export const EventCard: React.FC<EventCardProps> = ({
             <h3 className="text-lg font-bold text-white mb-1">{question}</h3>
             
             {context && (
-              <p className="text-sm text-white/70 line-clamp-2">{context}</p>
+              <div className="relative">
+                <p className="text-sm text-white/70 line-clamp-2">{context}</p>
+                <button
+                  onClick={() => setShowModal(true)}
+                  className="text-primary text-sm mt-1 hover:underline"
+                >
+                  See More
+                </button>
+              </div>
             )}
 
             <div className="mt-3 flex items-center gap-2">
@@ -107,6 +116,52 @@ export const EventCard: React.FC<EventCardProps> = ({
 
       {showModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white border border-gray-200 rounded-lg p-6 max-w-2xl w-full mx-4">
+            <div className="flex justify-between items-start mb-4">
+              <h3 className="text-xl font-bold text-gray-900">
+                Event Details
+              </h3>
+              <button
+                onClick={() => setShowModal(false)}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                ✕
+              </button>
+            </div>
+            
+            <div className="space-y-4">
+              {category && (
+                <div>
+                  <p className="text-sm text-gray-500">Category</p>
+                  <p className="text-gray-900">{category}</p>
+                </div>
+              )}
+              
+              <div>
+                <p className="text-sm text-gray-500">Question</p>
+                <p className="text-gray-900 font-medium">{question}</p>
+              </div>
+              
+              {context && (
+                <div>
+                  <p className="text-sm text-gray-500">Description</p>
+                  <p className="text-gray-900 whitespace-pre-wrap">{context}</p>
+                </div>
+              )}
+              
+              <div>
+                <p className="text-sm text-gray-500">Current Prediction</p>
+                <p className={`text-xl font-bold ${probabilityColor}`}>
+                  {(probability * 100).toFixed(1)}%
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showFeedbackModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-white border border-gray-200 rounded-lg p-6 max-w-md w-full mx-4">
             <h3 className="text-xl font-bold text-gray-900 mb-4">
               Confirm Your Feedback
@@ -125,7 +180,7 @@ export const EventCard: React.FC<EventCardProps> = ({
 
             <div className="flex justify-end gap-3">
               <button
-                onClick={() => setShowModal(false)}
+                onClick={() => setShowFeedbackModal(false)}
                 className="px-4 py-2 text-sm rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors"
               >
                 Cancel

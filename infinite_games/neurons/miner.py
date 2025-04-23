@@ -15,6 +15,7 @@ sys.path.append(parent_dir)
 # -- DO NOT TOUCH ABOVE --
 
 import time
+import uvicorn
 
 from bittensor import logging
 
@@ -23,6 +24,7 @@ from neurons.miner.forecasters.rlhf_forecaster import RLHFForecaster
 from neurons.miner.main import Miner
 from neurons.miner.models.event import MinerEvent
 from neurons.validator.utils.logger.logger import InfiniteGamesLogger, miner_logger
+from neurons.miner.api.server import app
 
 
 def get_forecaster(logger: InfiniteGamesLogger):
@@ -39,6 +41,13 @@ def get_forecaster(logger: InfiniteGamesLogger):
     return assign_forecaster
 
 
+async def run_api():
+    """Run the API REST server"""
+    config = uvicorn.Config(app, host="0.0.0.0", port=8000, log_level="info")
+    server = uvicorn.Server(config)
+    await server.serve()
+
+
 if __name__ == "__main__":
     start_time = time.time()
 
@@ -47,9 +56,19 @@ if __name__ == "__main__":
 
         miner = Miner(logger=miner_logger, assign_forecaster=get_forecaster(miner_logger))
         await miner.initialize()
-        with miner as miner:
-            while True:
-                miner_logger.debug(f"Miner running for {time.time() - start_time:.1f} seconds")
-                await asyncio.sleep(5)
+
+        try:
+            await asyncio.gather(
+                run_api(),
+                miner.run()
+            )
+        except KeyboardInterrupt:
+            print("Shutting down...")
+        finally:
+            await miner.storage.save()
+            if hasattr(miner, 'storage_task'):
+                miner.storage_task.cancel()
+            if hasattr(miner, 'task_executor_task'):
+                miner.task_executor_task.cancel()
 
     asyncio.run(run_miner())

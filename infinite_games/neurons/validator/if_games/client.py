@@ -184,3 +184,23 @@ class IfGamesClient:
                 response.raise_for_status()
 
                 return await response.json()
+
+    async def post_feedback(self, event_id: str, agrees: bool, comment: str = None) -> dict:
+        if not isinstance(event_id, str) or not isinstance(agrees, bool):
+            raise ValueError("Invalid parameters")
+
+        feedback_data = {
+            "event_id": event_id,
+            "agrees": agrees,
+            "comment": comment
+        }
+
+        auth_headers = self.make_auth_headers(body=feedback_data)
+
+        async with self.create_session(other_headers=auth_headers) as session:
+            path = "/api/v2/validators/feedback"
+
+            async with session.post(path, json=feedback_data) as response:
+                response.raise_for_status()
+
+                return await response.json()

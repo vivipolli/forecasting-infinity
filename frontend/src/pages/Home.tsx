@@ -1,68 +1,103 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { EventCard } from '../components/EventCard';
 import { EventFilter } from '../components/EventFilter';
-import { mockEvents } from '../mocks/events';
+import { getEvents, submitFeedback, Event } from '../services/api';
+
+const EXPERTISE_OPTIONS = [
+  'Crypto',
+  'Finance',
+  'Technology',
+  'Politics',
+  'Science',
+  'Economics',
+];
 
 const Home: React.FC = () => {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [events, setEvents] = useState<Event[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const categories = useMemo(() => {
-    const uniqueCategories = new Set(mockEvents.map(event => event.category));
-    return Array.from(uniqueCategories).sort();
+  useEffect(() => {
+    const fetchEvents = async () => {
+      try {
+        console.log('Fetching events...');
+        const ongoingEvents = await getEvents();
+        console.log('Received events:', ongoingEvents);
+        setEvents(ongoingEvents);
+        setError(null);
+      } catch (error) {
+        console.error('Error fetching events:', error);
+        setError('Failed to load events. Please try again later.');
+        setEvents([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchEvents();
   }, []);
 
-  const filteredEvents = useMemo(() => {
-    if (!selectedCategory) return mockEvents;
-    return mockEvents.filter(event => event.category === selectedCategory);
-  }, [selectedCategory]);
+  const filteredEvents = selectedCategory
+    ? events.filter(event => event.category === selectedCategory)
+    : events;
 
   const handleFeedback = async (eventId: string, agrees: boolean) => {
     try {
-      const response = await fetch('http://localhost:8000/api/feedback', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          event_id: eventId,
-          agrees,
-        }),
+      console.log('Submitting feedback for event:', eventId, agrees);
+      await submitFeedback({
+        event_id: eventId,
+        agrees,
       });
-
-      if (!response.ok) {
-        throw new Error('Failed to submit feedback');
-      }
+      
+      console.log('Feedback submitted successfully, refreshing events...');
+      const updatedEvents = await getEvents();
+      setEvents(updatedEvents);
     } catch (error) {
       console.error('Error submitting feedback:', error);
+      setError(error instanceof Error ? error.message : 'Failed to submit feedback');
     }
   };
 
-  return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold text-white">Active Events</h1>
-        <div className="text-white/50">
-          Last updated: {new Date().toLocaleTimeString()}
-        </div>
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center min-h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
       </div>
+    );
+  }
 
+  if (error) {
+    return (
+      <div className="flex justify-center items-center min-h-screen">
+        <div className="text-red-500">{error}</div>
+      </div>
+    );
+  }
+
+  console.log('Rendering events:', filteredEvents);
+
+  return (
+    <div className="container mx-auto px-4 py-8">
+      <h1 className="text-3xl font-bold mb-8 text-center">Forecasting Events</h1>
+      
       <EventFilter
-        categories={categories}
+        categories={EXPERTISE_OPTIONS}
         selectedCategory={selectedCategory}
         onCategoryChange={setSelectedCategory}
       />
 
-      <div className="space-y-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-8">
         {filteredEvents.map((event) => (
           <EventCard
-            key={event.eventId}
-            eventId={event.eventId}
+            key={event.event_id}
+            eventId={event.event_id}
             question={event.question}
             probability={event.probability}
             context={event.context}
             category={event.category}
-            expertValidations={event.expertValidations || 0}
-            onFeedback={(agrees: boolean) => handleFeedback(event.eventId, agrees)}
+            expertValidations={event.expert_validations}
+            onFeedback={handleFeedback}
           />
         ))}
       </div>

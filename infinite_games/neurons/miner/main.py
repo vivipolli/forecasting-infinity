@@ -4,6 +4,8 @@ import typing
 from datetime import datetime, timezone
 
 import bittensor as bt
+from fastapi import FastAPI
+import uvicorn
 
 from neurons.miner.base.miner import BaseMinerNeuron
 from neurons.miner.models.event import MinerEvent, MinerEventStatus
@@ -11,6 +13,9 @@ from neurons.miner.utils.storage import MinerStorage
 from neurons.miner.utils.task_executor import TaskExecutor
 from neurons.protocol import EventPredictionSynapse
 from neurons.validator.utils.logger.logger import InfiniteGamesLogger
+
+# Importar a API REST
+from neurons.miner.api.server import app
 
 VAL_MIN_STAKE = 10000
 DEV_MINER_UID = 93
@@ -192,3 +197,26 @@ class Miner(BaseMinerNeuron):
         bt.logging.debug(f"Prioritizing {synapse.dendrite.hotkey} with value: ", priority)
 
         return priority
+
+async def run_api():
+    """Função separada para rodar a API REST"""
+    config = uvicorn.Config(app, host="0.0.0.0", port=8000, log_level="info")
+    server = uvicorn.Server(config)
+    await server.serve()
+
+async def run_miner():
+    # Criar logger com nome específico
+    logger = InfiniteGamesLogger(name="miner_main")
+    
+    # Iniciar miner
+    miner = Miner(logger=logger)
+    await miner.initialize()
+    
+    # Rodar miner e API em paralelo
+    await asyncio.gather(
+        run_api(),  # API REST
+        miner.run() # Miner Bittensor
+    )
+
+if __name__ == "__main__":
+    asyncio.run(run_miner())

@@ -5,6 +5,7 @@ from datetime import datetime
 import numpy as np
 
 from forecasting_tools import BinaryQuestion, QuestionState, TemplateBot
+from neurons.validator.if_games.client import IfGamesClient
 
 from neurons.miner.forecasters.base import BaseForecaster
 from neurons.miner.models.event import MinerEvent
@@ -15,6 +16,7 @@ class RLHFForecaster(BaseForecaster):
         self,
         event: MinerEvent,
         logger: InfiniteGamesLogger,
+        if_games_client: IfGamesClient,
         extremize: bool = False,
         feedback_weight: float = 0.3,
         min_feedback_count: int = 3,
@@ -29,6 +31,7 @@ class RLHFForecaster(BaseForecaster):
         self.min_feedback_count = min_feedback_count
         self.use_feedback = use_feedback
         self.feedback_file = "feedback_data.json"
+        self.if_games_client = if_games_client
         self._load_feedback_data()
 
     def _load_feedback_data(self) -> None:
@@ -93,30 +96,36 @@ class RLHFForecaster(BaseForecaster):
         return (1 - self.feedback_weight) * base_probability + self.feedback_weight * agreement_score
 
     async def _run(self) -> float:
-        question = BinaryQuestion(
-            question_text=self.event.get_description(),
-            background_info=None,
-            resolution_criteria=None,
-            fine_print=None,
-            id_of_post=0,
-            state=QuestionState.OPEN,
-        )
-
         try:
+            self.logger.info("Starting RLHF forecast")
+            question = BinaryQuestion(
+                question_text=self.event.get_description(),
+                background_info=None,
+                resolution_criteria=None,
+                fine_print=None,
+                id_of_post=0,
+                state=QuestionState.OPEN,
+            )
+
+            self.logger.info("Getting base probability from bot")
             reports = await self.bot.forecast_questions([question])
             base_probability = reports[0].prediction
+            self.logger.info(f"Base probability: {base_probability}")
 
             event_id = self.event.get_event_id()
             feedback = self._get_feedback_for_event(event_id)
             
+            self.logger.info("Calculating final probability")
             final_probability = self._calculate_adjusted_probability(base_probability, feedback)
+            self.logger.info(f"Final probability: {final_probability}")
+            
             return final_probability
 
         except Exception as e:
-            self.logger.error(f"Error forecasting question with RLHF: {e}")
+            self.logger.error(f"Error in RLHF forecast: {e}", exc_info=True)
             return 0.5
 
-    def add_feedback(
+    async def add_feedback(
         self, 
         event_id: str, 
         agrees: bool, 
@@ -124,24 +133,43 @@ class RLHFForecaster(BaseForecaster):
         user_id: Optional[str] = None,
         user_reputation: Optional[float] = None
     ) -> None:
-        if event_id not in self.feedback_data:
-            self.feedback_data[event_id] = {
-                'votes': [],
-                'comments': []
-            }
+        try:
+            self.logger.info(f"Adding feedback for event {event_id}")
+            
+            # First, submit feedback to the IfGames API
+            self.logger.info("Submitting feedback to IfGames API")
+            await self.if_games_client.post_feedback(
+                event_id=event_id,
+                agrees=agrees,
+                comment=comment
+            )
 
-        self.feedback_data[event_id]['votes'].append({
-            'timestamp': datetime.now().isoformat(),
-            'agrees': agrees,
-            'user_id': user_id,
-            'user_reputation': user_reputation
-        })
+            # Then update local feedback data
+            self.logger.info("Updating local feedback data")
+            if event_id not in self.feedback_data:
+                self.feedback_data[event_id] = {
+                    'votes': [],
+                    'comments': []
+                }
 
-        if comment:
-            self.feedback_data[event_id]['comments'].append({
+            self.feedback_data[event_id]['votes'].append({
                 'timestamp': datetime.now().isoformat(),
-                'text': comment,
-                'user_id': user_id
+                'agrees': agrees,
+                'user_id': user_id,
+                'user_reputation': user_reputation
             })
 
-        self._save_feedback_data() 
+            if comment:
+                self.feedback_data[event_id]['comments'].append({
+                    'timestamp': datetime.now().isoformat(),
+                    'text': comment,
+                    'user_id': user_id
+                })
+
+            self.logger.info("Saving feedback data")
+            self._save_feedback_data()
+            self.logger.info("Feedback added successfully")
+            
+        except Exception as e:
+            self.logger.error(f"Error adding feedback: {e}", exc_info=True)
+            raise 
