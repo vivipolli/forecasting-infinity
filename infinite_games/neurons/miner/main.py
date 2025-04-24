@@ -205,17 +205,17 @@ async def run_api():
     await server.serve()
 
 async def run_miner():
-    # Criar logger com nome específico
+    # Create logger with specific name
     logger = InfiniteGamesLogger(name="miner_main")
     
-    # Iniciar miner
+    # Start miner
     miner = Miner(logger=logger)
     await miner.initialize()
     
-    # Rodar miner e API em paralelo
+    # Run miner and API in parallel
     await asyncio.gather(
-        run_api(),  # API REST
-        miner.run() # Miner Bittensor
+        run_api(),  # REST API
+        miner.run() # Bittensor Miner
     )
 
 if __name__ == "__main__":

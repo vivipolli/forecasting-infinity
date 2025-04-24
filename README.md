@@ -1,48 +1,146 @@
-# Infinite Games Prediction System
+# 🔮 Infinity Crystal
 
-## Overview
+## 📝 Overview
+A prediction market system that uses AI and expert validation to forecast event outcomes. The system applies Reinforcement Learning from Human Feedback (RLHF) principles, where AI-generated predictions are continuously refined through expert validation. This creates a dynamic feedback loop where human expertise guides and improves the AI's forecasting capabilities.
 
-This project enhances the Infinite Games ecosystem by creating an advanced prediction system that combines AI-powered forecasting with human expert validation. The system aims to improve market liquidity and forecast accuracy through innovative approaches to prediction and validation.
+**Key Concepts**: AI Forecasting, Expert Validation, RLHF (Reinforcement Learning from Human Feedback), Prediction Markets
 
-### Key Innovations
+## 🔄 How It Works
 
-- **RLHF Integration**
-  - Base adjustment of 0.1 per expert feedback
-  - Maximum adjustment capped at 0.3
-  - Weighted adjustments based on expert reliability
-  - Minimum of 3 expert validations required
-  - One feedback per expert per event
-- Real-time event monitoring and prediction updates
-- Modern web interface for event visualization and feedback submission
+### Expert Onboarding
+1. Submit expert application form with your area of expertise
+2. Get approved through:
+   - AI analysis of social media presence
+   - Or human evaluation of credentials
+3. Receive expert role with specific domain access
 
-## System Architecture
+### Prediction Process
+1. AI generates initial probability forecast for events
+2. Experts receive event listings with current predictions
+3. Experts can review and provide feedback:
+   - Click "Agree" if they believe the event will occur
+   - Click "Disagree" if they believe the event will not occur
+4. System recalculates prediction based on:
+   - Expert's feedback (agree/disagree)
+   - Expert's weight in their domain
+   - Current prediction value
+5. Updated prediction is displayed and tracked
 
-### Core Components
+## 🏗️ Feedback Implementation
 
-1. **Miner Service**
-   - Handles event predictions using the RLHF forecaster
-   - Integrates with Bittensor network for decentralized operations
-   - Processes and weights expert feedback using ExpertFeedbackAdjuster
-     - Each expert feedback adjusts probability by 0.1 (base)
-     - Expert weight multiplier (e.g., 1.1 for trusted experts)
-     - Maximum total adjustment capped at 0.3
-     - Minimum 3 expert validations required
-     - One feedback per expert per event to prevent manipulation
-   - Caches predictions to optimize performance
+### LLM Forecaster
+```python
+# neurons/miner/forecasters/llm_forecaster.py
+class LLMForecaster(BaseForecaster):
+    ...
 
-2. **API Service**
-   - RESTful endpoints for events and feedback
-   - Real-time event updates
-   - Feedback submission and validation
-   - Integration with IfGames API
+    async def adjust_with_feedback(
+        self,
+        current_prediction: float,
+        agrees: bool,
+        expert_weight: float = 1.0,
+        expert_id: str = None,
+        event_id: str = None
+    ) -> float:
+        try:
+            self.logger.info(f"Adjusting prediction with expert feedback (weight: {expert_weight})")
+            
+            new_prediction = self.feedback_adjuster.adjust_prediction(
+                current_prediction=current_prediction,
+                expert_agrees=agrees,
+                expert_weight=expert_weight,
+                expert_id=expert_id,
+                event_id=event_id
+            )
+            
+            self.logger.info(f"Adjusted prediction: {current_prediction} -> {new_prediction}")
+            return new_prediction
+            
+        except Exception as e:
+            self.logger.error(f"Error adjusting prediction: {e}")
+            return current_prediction
 
-3. **Frontend**
-   - Event card display with probabilities
-   - Feedback modal for expert input
-   - Real-time prediction updates
-   - Category-based filtering
+### Expert Feedback Adjuster
+```python
+# neurons/miner/services/expert_feedback_adjuster.py
+class ExpertFeedbackAdjuster:
+    def __init__(self):
+        self.expert_history = {}
+        self.feedback_history = {}
+        
+    def adjust_prediction(self, current_prediction: float, expert_agrees: bool, 
+                         expert_weight: float = 1.0, expert_id: str = None, 
+                         event_id: str = None) -> float:
+        if not self._validate_expert(expert_id):
+            return current_prediction
+            
+        feedback_key = f"{expert_id}_{event_id}"
+        if feedback_key in self.feedback_history:
+            return current_prediction
+            
+        self.feedback_history[feedback_key] = {
+            "timestamp": datetime.now(),
+            "agrees": expert_agrees,
+            "weight": expert_weight,
+            "event_id": event_id
+        }
+        
+        adjustment = expert_weight * (0.1 if expert_agrees else -0.1)
+        adjustment *= self._calculate_expert_multiplier(expert_id)
+        adjustment = max(min(adjustment, 0.3), -0.3)
+        
+        return max(0.0, min(1.0, current_prediction + adjustment))
+```
 
-## Getting Started
+### Event Service
+```python
+# neurons/miner/services/event_service.py
+class EventService:
+    def __init__(self, if_games_client: IfGamesClient):
+        self.if_games_client = if_games_client
+        self.prediction_history = {}
+        self.expert_performance = {}
+        
+    async def process_feedback(self, event_id: str, expert_id: str, agrees: bool):
+        event = await self.if_games_client.get_event(event_id)
+        old_probability = event.get_probability()
+        
+        forecaster = LLMForecaster(event, self.logger, self.if_games_client)
+        new_probability = await forecaster.adjust_with_feedback(
+            current_prediction=old_probability,
+            agrees=agrees,
+            expert_id=expert_id,
+            event_id=event_id
+        )
+        
+        self.prediction_history[event_id] = {
+            "timestamp": datetime.now(),
+            "old_probability": old_probability,
+            "new_probability": new_probability,
+            "expert_id": expert_id,
+            "agrees": agrees
+        }
+        
+        await self.if_games_client.post_prediction(event_id, new_probability)
+```
+
+#### API Layer (`neurons/miner/api/`)
+- `custom_miner.py`: Custom API endpoints for feedback and predictions
+- `server.py`: FastAPI server setup
+- `run.py`: API startup script
+
+#### Services (`neurons/miner/services/`)
+- `event_service.py`: Event management and prediction processing
+- `expert_feedback_adjuster.py`: Expert feedback handling and prediction adjustment
+- `if_games_service.py`: IfGames API integration
+
+## 🔜 Next Steps
+- Implement expert performance tracking
+- Add prediction history visualization
+- Enhance feedback weighting system
+- Improve prediction accuracy algorithms
+
+## 🛠️ Local Development Setup
 
 ### Prerequisites
 
@@ -63,179 +161,8 @@ python3 neurons/miner.py --netuid 155 --subtensor.network test --wallet.name min
 python3 -m neurons.miner.api.run
 ```
 
-## Project Structure
+> Note: This is the basic setup. For complete setup instructions, including wallet creation, registration, and advanced configuration, please refer to [miner.md](infinite_games/docs/miner.md).
 
-```
-infinite_games/
-└── neurons/
-    └── miner/
-        ├── api/                    # API endpoints
-        ├── forecasters/            # Prediction models
-        ├── services/              # Business logic
-        └── models/                # Data models
-```
 
-## Future Improvements
-
-   - Category-specific adjustment limits
-   - Feedback decay over time
-   - Expert reputation system
-   - Feedback cooling period
-   - Rate limiting per expert
-   - IP-based restrictions
-   - Expert verification system
-   - Anti-manipulation measures
-
-## Local Development Setup
-
-### Prerequisites
-
-- Python 3.8+
-- Node.js 16+
-- Bittensor wallet configured for testnet
-- API keys for LLM services:
-  ```bash
-  export PERPLEXITY_API_KEY=<your_perplexity_api_key>
-  export OPENAI_API_KEY=<your_openai_api_key>
-  ```
-
-### Running the Services
-
-1. **Start the Miner**
-```bash
-python3 neurons/miner.py --netuid 155 --subtensor.network test --wallet.name miner --wallet.hotkey miner
-```
-
-2. **Start the API Service**
-```bash
-python3 -m neurons.miner.api.run
-```
-
-The miner will run on port 8091 (default) and the API service on port 8000.
-
-### Testing
-
-#### Manual API Testing
-
-1. **Test Event Fetching**
-```bash
-curl http://localhost:8000/api/events
-```
-
-2. **Test Feedback Submission**
-```bash
-curl -X POST http://localhost:8000/api/feedback \
-  -H "Content-Type: application/json" \
-  -d '{
-    "event_id": "your_event_id",
-    "agrees": true,
-    "comment": "Test feedback"
-  }'
-```
-
-#### Direct Test Scripts
-
-1. **Run API Integration Test**
-```bash
-python3 neurons/miner/tests/test_api.py
-```
-
-2. **Run Miner Integration Test**
-```bash
-python3 neurons/miner/tests/test_miner.py
-```
-
-These tests will verify:
-- Event fetching and processing
-- Feedback submission and integration
-- RLHF forecaster functionality
-- Storage and caching systems
-- Task execution and async operations
-
-## Feedback and Prediction Storage Flow
-
-### Overview
-The system implements a robust feedback-based prediction system that combines AI-powered forecasts with expert validations. Predictions are continuously refined through expert feedback and stored in a persistent database for historical tracking and analysis.
-
-### Components
-
-1. **Event Service**
-   - Manages events and their predictions
-   - Handles feedback processing
-   - Uses `ExpertFeedbackAdjuster` to calculate new probabilities
-   - Maintains prediction history and expert performance metrics
-
-2. **Expert Feedback System**
-   - Experts can agree or disagree with current predictions
-   - Dynamic expert weighting based on historical performance
-   - Feedback validation and anti-manipulation measures
-   - Expert reputation tracking and scoring
-
-3. **Prediction Storage**
-   - Predictions stored in PostgreSQL database
-   - Historical tracking of all prediction changes
-   - Expert feedback history and impact analysis
-   - Performance metrics and analytics
-
-### Flow
-
-1. Expert submits feedback through the frontend
-2. Feedback is sent to `/api/feedback` endpoint
-3. `EventService` processes the feedback:
-   - Validates expert credentials and reputation
-   - Checks for manipulation attempts
-   - Uses `ExpertFeedbackAdjuster` to calculate new probability
-   - Updates event's probability in database
-   - Records feedback and prediction change history
-4. Updated prediction is immediately available for display
-5. Expert performance metrics are updated
-
-### Technical Details
-
-- Feedback endpoint: `POST /api/feedback`
-- Required parameters:
-  - `event_id`: string
-  - `agrees`: boolean
-  - `expert_id`: string
-  - `comment`: string (optional)
-  - `confidence`: float (optional)
-
-- Response format:
-```json
-{
-  "success": boolean,
-  "message": string,
-  "timestamp": datetime,
-  "new_probability": float,
-  "expert_impact": float,
-  "prediction_history": array
-}
-```
-
-### Features
-
-- **Persistent Storage**
-  - All predictions stored in PostgreSQL
-  - Historical tracking of changes
-  - Expert performance metrics
-  - Event resolution tracking
-
-- **Expert System**
-  - Dynamic weight calculation
-  - Reputation scoring
-  - Feedback validation
-  - Anti-manipulation measures
-
-- **Analytics**
-  - Prediction accuracy tracking
-  - Expert performance analysis
-  - Market type specific metrics
-  - Historical trend analysis
-
-- **Security**
-  - Expert authentication
-  - Rate limiting
-  - IP-based restrictions
-  - Feedback validation
 
 
