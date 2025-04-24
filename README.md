@@ -10,6 +10,11 @@ This MVP extends the Infinite Games template by adding a complete forecasting sy
 
 - RLHF (Reinforcement Learning with Human Feedback) integration
 - Expert feedback collection and weighting system
+  - Base adjustment of 0.1 per expert feedback
+  - Maximum adjustment capped at 0.3
+  - Weighted adjustments based on expert reliability
+  - Minimum of 3 expert validations required
+  - One feedback per expert per event
 - Real-time event monitoring and prediction updates
 - Modern web interface for event visualization and feedback submission
 
@@ -20,7 +25,12 @@ This MVP extends the Infinite Games template by adding a complete forecasting sy
 1. **Miner Service**
    - Handles event predictions using the RLHF forecaster
    - Integrates with Bittensor network for decentralized operations
-   - Processes and weights expert feedback
+   - Processes and weights expert feedback using ExpertFeedbackAdjuster
+     - Each expert feedback adjusts probability by 0.1 (base)
+     - Expert weight multiplier (e.g., 1.1 for trusted experts)
+     - Maximum total adjustment capped at 0.3
+     - Minimum 3 expert validations required
+     - One feedback per expert per event to prevent manipulation
    - Caches predictions to optimize performance
 
 2. **API Service**
@@ -37,6 +47,17 @@ This MVP extends the Infinite Games template by adding a complete forecasting sy
 - Category-based filtering
 - Responsive design for all devices
 
+## Future Improvements
+
+   - Category-specific adjustment limits
+   - Feedback decay over time
+   - Expert reputation system
+   - Feedback cooling period
+   - Rate limiting per expert
+   - IP-based restrictions
+   - Expert verification system
+   - Anti-manipulation measures
+
 ## Local Development Setup
 
 ### Prerequisites
@@ -44,6 +65,11 @@ This MVP extends the Infinite Games template by adding a complete forecasting sy
 - Python 3.8+
 - Node.js 16+
 - Bittensor wallet configured for testnet
+- API keys for LLM services:
+  ```bash
+  export PERPLEXITY_API_KEY=<your_perplexity_api_key>
+  export OPENAI_API_KEY=<your_openai_api_key>
+  ```
 
 ### Running the Services
 
@@ -60,7 +86,6 @@ python3 -m neurons.miner.api.run
 The miner will run on port 8091 (default) and the API service on port 8000.
 
 ### Testing
-
 
 #### Manual API Testing
 
@@ -116,16 +141,15 @@ infinite_games/
         │
         ├── forecasters/           # Prediction models
         │   ├── base.py           # Base forecaster class
-        │   ├── llm_forecaster.py # LLM-based predictions
-        │   └── rlhf_forecaster.py # RLHF with expert feedback
+        │   └── llm_forecaster.py # LLM-based predictions with expert feedback
         │
         ├── models/               # Data models
         │   └── event.py         # Event data structure
         │
         ├── services/            # Business logic
         │   ├── event_service.py # Event handling
+        │   ├── expert_feedback_adjuster.py # Expert feedback processing
         │   └── if_games_service.py # IfGames integration
-
 ```
 
 ### Key Components
@@ -137,11 +161,11 @@ infinite_games/
 
 2. **Forecasters** (`forecasters/`)
    - `base.py`: Abstract forecaster interface
-   - `llm_forecaster.py`: LLM-based prediction implementation
-   - `rlhf_forecaster.py`: RLHF prediction with expert feedback
+   - `llm_forecaster.py`: LLM-based prediction with expert feedback integration
 
 3. **Services** (`services/`)
    - `event_service.py`: Event management and caching
+   - `expert_feedback_adjuster.py`: Expert feedback processing and prediction adjustment
    - `if_games_service.py`: Integration with IfGames platform
 
 ### Running the Miner
@@ -192,6 +216,11 @@ tail -f ~/.bittensor/miners/netuid_155/logs/api.log
 2. Events are processed by the RLHF forecaster
 3. Predictions are stored and cached
 4. API endpoints serve predictions and collect feedback
-5. Feedback is integrated into future predictions
+5. Expert feedback is processed by ExpertFeedbackAdjuster:
+   - Each expert feedback adjusts probability by 0.1 (base)
+   - Expert weight multiplier applied (e.g., 1.1 for trusted experts)
+   - Maximum total adjustment capped at 0.3
+   - Minimum 3 expert validations required
+6. Adjusted predictions are sent back to the network
 
 

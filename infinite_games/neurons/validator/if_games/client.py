@@ -161,13 +161,17 @@ class IfGamesClient:
 
         auth_headers = self.make_auth_headers(body=predictions)
 
-        async with self.create_session(other_headers=auth_headers) as session:
-            path = "/api/v1/validators/data"
+        try:
+            async with self.create_session(other_headers=auth_headers) as session:
+                path = "/api/v1/validators/data"
 
-            async with session.post(path, json=predictions) as response:
-                response.raise_for_status()
-
-                return await response.json()
+                async with session.post(path, json=predictions) as response:
+                    response.raise_for_status()
+                    self.__logger.info(f"Successfully posted predictions: {predictions}")
+                    return await response.json()
+        except Exception as e:
+            self.__logger.error(f"Error posting predictions: {e}")
+            return None
 
     async def post_scores(self, scores: dict):
         if not isinstance(scores, dict):
@@ -185,22 +189,3 @@ class IfGamesClient:
 
                 return await response.json()
 
-    async def post_feedback(self, event_id: str, agrees: bool, comment: str = None) -> dict:
-        if not isinstance(event_id, str) or not isinstance(agrees, bool):
-            raise ValueError("Invalid parameters")
-
-        feedback_data = {
-            "event_id": event_id,
-            "agrees": agrees,
-            "comment": comment
-        }
-
-        auth_headers = self.make_auth_headers(body=feedback_data)
-
-        async with self.create_session(other_headers=auth_headers) as session:
-            path = "/api/v2/validators/feedback"
-
-            async with session.post(path, json=feedback_data) as response:
-                response.raise_for_status()
-
-                return await response.json()

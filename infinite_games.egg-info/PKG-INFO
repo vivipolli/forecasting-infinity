@@ -1,0 +1,8 @@
+Metadata-Version: 2.1
+Name: infinite_games
+Version: 0.1.0
+Requires-Dist: fastapi
+Requires-Dist: uvicorn
+Requires-Dist: pydantic
+Requires-Dist: aiohttp
+Requires-Dist: bittensor

@@ -12,6 +12,7 @@ export interface Event {
   created_at: number;
   end_date: number;
   answer: string | null;
+  probability: number;
 }
 
 export class EventsService {

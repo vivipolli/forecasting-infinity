@@ -4,17 +4,19 @@ const API_URL = 'http://localhost:8000/api';
 
 export interface Event {
   event_id: string;
-  question: string;
+  market_type: string;
   probability: number;
-  context: string;
-  category: string;
-  expert_validations: number;
+  description: string;
+  cutoff: string;
+  status: string;
 }
 
 export interface Feedback {
   event_id: string;
   agrees: boolean;
   comment?: string;
+  expert_weight: number;
+  expert_id: string;  // Required expert identifier
 }
 
 export const getEvents = async (): Promise<Event[]> => {
@@ -39,6 +41,10 @@ export const predictEvent = async (eventId: string): Promise<Event> => {
 
 export const submitFeedback = async (feedback: Feedback): Promise<boolean> => {
   try {
+    if (!feedback.expert_id) {
+      throw new Error('Expert ID is required');
+    }
+    
     const response = await axios.post(`${API_URL}/feedback`, feedback);
     console.log('Feedback response:', response.data);
     return response.data.success;

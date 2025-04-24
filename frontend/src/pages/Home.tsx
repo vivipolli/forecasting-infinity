@@ -38,9 +38,7 @@ const Home: React.FC = () => {
     fetchEvents();
   }, []);
 
-  const filteredEvents = selectedCategory
-    ? events.filter(event => event.category === selectedCategory)
-    : events;
+  const filteredEvents = events;
 
   const handleFeedback = async (eventId: string, agrees: boolean) => {
     try {
@@ -48,6 +46,8 @@ const Home: React.FC = () => {
       await submitFeedback({
         event_id: eventId,
         agrees,
+        expert_weight: 1.0,  // Default weight
+        expert_id: 'test_expert'  // For testing, should be replaced with actual expert ID
       });
       
       console.log('Feedback submitted successfully, refreshing events...');
@@ -92,11 +92,9 @@ const Home: React.FC = () => {
           <EventCard
             key={event.event_id}
             eventId={event.event_id}
-            question={event.question}
+            description={event.description}
             probability={event.probability}
-            context={event.context}
-            category={event.category}
-            expertValidations={event.expert_validations}
+            expertValidations={0}
             onFeedback={handleFeedback}
           />
         ))}

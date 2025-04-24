@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 from neurons.miner.models.event import MinerEvent
 from neurons.validator.utils.logger.logger import InfiniteGamesLogger
 from neurons.miner.services.if_games_service import IfGamesService
-from neurons.miner.forecasters.rlhf_forecaster import RLHFForecaster
+from neurons.miner.forecasters.llm_forecaster import LLMForecaster
 
 class EventService:
     def __init__(
@@ -24,95 +24,108 @@ class EventService:
             self.logger.info(f"Refreshing events from date {from_date}")
             
             # Get events from service (will use mock if no real events)
-            self.events = await self.if_games_service.get_events(from_date=from_date)
-            self.logger.info(f"Received {len(self.events)} events from service")
+            events = await self.if_games_service.get_events(from_date=from_date)
+            self.logger.info(f"Received {len(events)} events from service")
             
-            if not self.events:
+            if not events:
                 self.logger.warning("No events found, using mock events")
-                self.events = await self.if_games_service.get_events(from_date=0)
-                self.logger.info(f"Using {len(self.events)} mock events")
+                events = await self.if_games_service.get_events(from_date=0)
+                self.logger.info(f"Using {len(events)} mock events")
             
-            # Update probabilities using RLHF forecaster
-            self.logger.info("Updating probabilities with RLHF forecaster")
-            for event in self.events:
-                forecaster = RLHFForecaster(
-                    event=event,
-                    logger=self.logger,
-                    if_games_client=self.if_games_service.client,
-                    extremize=True,
-                    feedback_weight=self.feedback_weight,
-                    min_feedback_count=3,
-                    use_feedback=True
-                )
-                event.probability = await forecaster._run()
+            # Only update probabilities for real events, preserve mock event probabilities
+            self.logger.info("Updating probabilities with LLM forecaster")
+            for event in events:
+                # Check if this is a mock event by looking at the event_id
+                is_mock_event = any(event.event_id == mock_event.event_id for mock_event in get_mock_events())
+                if not is_mock_event and not event.probability:
+                    forecaster = LLMForecaster(
+                        event=event,
+                        logger=self.logger,
+                        if_games_client=self.if_games_service.client,
+                        extremize=True
+                    )
+                    event.probability = await forecaster._run()
+            
+            # Store events
+            self.events = events
             
             self.logger.info(f"Returning {len(self.events)} events with updated probabilities")
             return self.events
         except Exception as e:
             self.logger.error(f"Error refreshing events: {e}")
-            # Return mock events as fallback
-            mock_events = await self.if_games_service.get_events(from_date=0)
-            self.logger.info(f"Using {len(mock_events)} mock events as fallback")
-            return mock_events
+            if not hasattr(self, 'events') or not self.events:
+                mock_events = await self.if_games_service.get_events(from_date=0)
+                self.events = mock_events
+                self.logger.info(f"Using {len(mock_events)} mock events as fallback")
+            return self.events
 
     async def get_event(self, event_id: str) -> Optional[MinerEvent]:
-        return next((event for event in self.events if event.event_id == event_id), None)
+        """
+        Get event by ID, refreshing events if not found
+        """
+        # Try to find event in current list
+        event = next((event for event in self.events if event.event_id == event_id), None)
+        
+        # If not found, try refreshing events
+        if not event:
+            self.logger.info(f"Event {event_id} not found, refreshing events")
+            await self.refresh_events()
+            event = next((event for event in self.events if event.event_id == event_id), None)
+            
+        if not event:
+            self.logger.warning(f"Event {event_id} not found after refresh")
+            
+        return event
 
     async def process_feedback(
         self,
         event_id: str,
         agrees: bool,
-        comment: Optional[str] = None
-    ) -> bool:
+        expert_weight: float = 1.0,
+        expert_id: str = None
+    ):
+        """
+        Process expert feedback and adjust prediction using LLMForecaster
+        """
         try:
-            self.logger.info(f"Starting feedback process for event {event_id}")
+            self.logger.info(f"Processing feedback for event {event_id} from expert {expert_id}")
             
-            # Get the event
             event = await self.get_event(event_id)
             if not event:
-                self.logger.error(f"Event {event_id} not found")
+                self.logger.error(f"Event {event_id} not found in service")
                 return False
-                
-            self.logger.info(f"Found event: {event.event_id}")
-
-            # Initialize RLHF forecaster
-            self.logger.info("Initializing RLHF forecaster")
-            forecaster = RLHFForecaster(
+            
+            self.logger.info(f"Current probability for event {event_id}: {event.probability}")
+            
+            forecaster = LLMForecaster(
                 event=event,
                 logger=self.logger,
                 if_games_client=self.if_games_service.client,
-                extremize=True,
-                feedback_weight=self.feedback_weight,
-                min_feedback_count=3,
-                use_feedback=True
+                extremize=True
             )
-
-            # Add feedback using RLHF forecaster
-            self.logger.info(f"Adding feedback: agrees={agrees}, comment={comment}")
-            try:
-                await forecaster.add_feedback(
-                    event_id=event_id,
-                    agrees=agrees,
-                    comment=comment
-                )
-                self.logger.info("Feedback added successfully")
-            except Exception as e:
-                self.logger.error(f"Error adding feedback: {e}")
-                return False
-
-            # Update probability using RLHF
-            self.logger.info("Updating probability with RLHF")
-            try:
-                new_probability = await forecaster._run()
-                event.probability = new_probability
-                self.logger.info(f"Probability updated to: {new_probability}")
-            except Exception as e:
-                self.logger.error(f"Error updating probability: {e}")
-                return False
             
-            self.logger.info("Feedback process completed successfully")
-            return True
+            new_prediction = await forecaster.adjust_with_feedback(
+                current_prediction=event.probability,
+                agrees=agrees,
+                expert_weight=expert_weight,
+                expert_id=expert_id,
+                event_id=event_id
+            )
+            
+            self.logger.info(f"New prediction for event {event_id}: {new_prediction}")
+            
+            event.probability = new_prediction
+            
+            try:
+                await self.if_games_service.client.post_predictions({
+                    event_id: {"probability": new_prediction}
+                })
+                self.logger.info(f"Successfully posted new prediction for event {event_id}")
+                return True
+            except Exception as e:
+                self.logger.error(f"Error posting prediction to validators: {e}")
+                return False
             
         except Exception as e:
-            self.logger.error(f"Error in feedback process: {e}", exc_info=True)
+            self.logger.error(f"Error processing feedback: {e}", exc_info=True)
             return False 

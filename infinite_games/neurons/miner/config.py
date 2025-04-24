@@ -14,5 +14,6 @@ class MinerConfig:
         self.network = network
         self.netuid = netuid
         self.wallet = Wallet(name=wallet_name, hotkey=wallet_hotkey)
-        self.feedback_weight = 0.3
+        self.feedback_weight = 0.1  # Base adjustment for each feedback
+        self.max_feedback_adjustment = 0.3  # Maximum adjustment allowed
         self.min_feedback_count = 3 

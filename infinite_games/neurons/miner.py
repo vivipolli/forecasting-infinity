@@ -20,25 +20,24 @@ import uvicorn
 from bittensor import logging
 
 from neurons.miner.forecasters.base import BaseForecaster
-from neurons.miner.forecasters.rlhf_forecaster import RLHFForecaster
+from neurons.miner.forecasters.llm_forecaster import LLMForecaster
 from neurons.miner.main import Miner
 from neurons.miner.models.event import MinerEvent
 from neurons.validator.utils.logger.logger import InfiniteGamesLogger, miner_logger
 from neurons.miner.api.server import app
 
 
-def get_forecaster(logger: InfiniteGamesLogger):
-    async def assign_forecaster(event: MinerEvent) -> typing.Type[BaseForecaster]:
-        return RLHFForecaster(
-            event,
-            logger=logger,
-            extremize=False,
-            feedback_weight=0.3,  # Weight of human feedback in final prediction
-            min_feedback_count=3,  # Minimum number of feedbacks required to use them
-            use_feedback=True,     # Whether to use feedback at all
-        )
-
-    return assign_forecaster
+async def assign_forecaster(event: MinerEvent) -> BaseForecaster:
+    """
+    Assign a forecaster based on event type.
+    Uses LLMForecaster as the default forecaster.
+    """
+    return LLMForecaster(
+        event=event,
+        logger=logger,
+        if_games_client=if_games_client,
+        extremize=True
+    )
 
 
 async def run_api():
@@ -54,7 +53,7 @@ if __name__ == "__main__":
     async def run_miner() -> None:
         miner_logger.start_session()
 
-        miner = Miner(logger=miner_logger, assign_forecaster=get_forecaster(miner_logger))
+        miner = Miner(logger=miner_logger, assign_forecaster=assign_forecaster)
         await miner.initialize()
 
         try:

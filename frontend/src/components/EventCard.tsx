@@ -3,7 +3,7 @@ import { useExpert } from '../contexts/ExpertContext';
 
 interface EventCardProps {
   eventId: string;
-  question: string;
+  description: string;
   probability: number;
   context?: string;
   category?: string;
@@ -13,7 +13,7 @@ interface EventCardProps {
 
 export const EventCard: React.FC<EventCardProps> = ({
   eventId,
-  question,
+  description,
   probability,
   context,
   category,
@@ -52,19 +52,18 @@ export const EventCard: React.FC<EventCardProps> = ({
               </span>
             )}
             
-            <h3 className="text-lg font-bold text-white mb-1">{question}</h3>
+            <h3 className="text-lg font-bold text-white mb-1">
+              {description.split('?')[0] + '?'}
+            </h3>
             
-            {context && (
-              <div className="relative">
-                <p className="text-sm text-white/70 line-clamp-2">{context}</p>
-                <button
-                  onClick={() => setShowModal(true)}
-                  className="text-primary text-sm mt-1 hover:underline"
-                >
-                  See More
-                </button>
-              </div>
-            )}
+            <div className="relative">
+              <button
+                onClick={() => setShowModal(true)}
+                className="text-primary text-sm mt-1 hover:underline"
+              >
+                See More
+              </button>
+            </div>
 
             <div className="mt-3 flex items-center gap-2">
               <span className="text-secondary font-semibold">
@@ -130,24 +129,15 @@ export const EventCard: React.FC<EventCardProps> = ({
             </div>
             
             <div className="space-y-4">
-              {category && (
-                <div>
-                  <p className="text-sm text-gray-500">Category</p>
-                  <p className="text-gray-900">{category}</p>
-                </div>
-              )}
-              
               <div>
                 <p className="text-sm text-gray-500">Question</p>
-                <p className="text-gray-900 font-medium">{question}</p>
+                <p className="text-gray-900 font-medium">{description.split('?')[0] + '?'}</p>
               </div>
               
-              {context && (
-                <div>
-                  <p className="text-sm text-gray-500">Description</p>
-                  <p className="text-gray-900 whitespace-pre-wrap">{context}</p>
-                </div>
-              )}
+              <div>
+                <p className="text-sm text-gray-500">Description</p>
+                <p className="text-gray-900 whitespace-pre-wrap">{description.split('?')[1]?.trim()}</p>
+              </div>
               
               <div>
                 <p className="text-sm text-gray-500">Current Prediction</p>
@@ -169,7 +159,7 @@ export const EventCard: React.FC<EventCardProps> = ({
             
             <div className="mb-6">
               <p className="text-gray-600 mb-2">Event Details:</p>
-              <p className="text-gray-900 font-medium">{question}</p>
+              <p className="text-gray-900 font-medium">{description}</p>
               {context && (
                 <p className="text-gray-600 text-sm mt-1">{context}</p>
               )}

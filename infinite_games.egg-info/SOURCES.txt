@@ -1,0 +1,7 @@
+README.md
+setup.py
+infinite_games.egg-info/PKG-INFO
+infinite_games.egg-info/SOURCES.txt
+infinite_games.egg-info/dependency_links.txt
+infinite_games.egg-info/requires.txt
+infinite_games.egg-info/top_level.txt
