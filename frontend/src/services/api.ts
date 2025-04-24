@@ -1,14 +1,22 @@
 import axios from 'axios';
+import { EventsService } from './EventsService';
 
+// Configuration
+const USE_DIRECT_API = true; // Set to false to use local miner
 const API_URL = 'http://localhost:8000/api';
 
 export interface Event {
   event_id: string;
   market_type: string;
-  probability: number;
+  title: string;
   description: string;
-  cutoff: string;
-  status: string;
+  cutoff: number;
+  start_date: number;
+  created_at: number;
+  end_date: number;
+  answer: string | null;
+  probability?: number; // Optional as it's not in the API response
+  status?: string; // Optional as it's not in the API response
 }
 
 export interface Prediction {
@@ -25,19 +33,15 @@ export interface EventPredictions {
 export interface Feedback {
   event_id: string;
   agrees: boolean;
-  comment?: string;
-  expert_weight: number;
-  expert_id: string;  // Required expert identifier
+  expert_id: string;
 }
 
 export const getEvents = async (): Promise<Event[]> => {
   try {
-    const response = await axios.get(`${API_URL}/events`);
-    console.log('API Response:', response.data); // Debug log
-    if (!response.data || !Array.isArray(response.data)) {
-      console.error('Invalid response format:', response.data);
-      return [];
+    if (USE_DIRECT_API) {
+      return await EventsService.getOngoingEvents();
     }
+    const response = await axios.get(`${API_URL}/events`);
     return response.data;
   } catch (error) {
     console.error('Error fetching events:', error);
@@ -47,6 +51,13 @@ export const getEvents = async (): Promise<Event[]> => {
 
 export const getPredictions = async (eventId: string): Promise<EventPredictions> => {
   try {
+    if (USE_DIRECT_API) {
+      const predictions = await EventsService.getEventPredictions(eventId);
+      return {
+        count: predictions.predictions.length,
+        predictions: predictions.predictions
+      };
+    }
     const response = await axios.get(`${API_URL}/events/${eventId}/predictions`);
     return response.data;
   } catch (error) {
@@ -66,17 +77,18 @@ export const submitFeedback = async (feedback: Feedback): Promise<boolean> => {
       throw new Error('Expert ID is required');
     }
     
+    if (USE_DIRECT_API) {
+      return await EventsService.submitFeedback(
+        feedback.event_id,
+        feedback.agrees,
+        feedback.expert_id
+      );
+    }
+    
     const response = await axios.post(`${API_URL}/feedback`, feedback);
-    console.log('Feedback response:', response.data);
     return response.data.success;
   } catch (error) {
     console.error('Error submitting feedback:', error);
-    if (axios.isAxiosError(error)) {
-      if (error.response?.status === 404) {
-        throw new Error('Event not found');
-      }
-      throw new Error(error.response?.data?.detail || 'Failed to submit feedback');
-    }
     throw error;
   }
 };
