@@ -223,4 +223,90 @@ tail -f ~/.bittensor/miners/netuid_155/logs/api.log
    - Minimum 3 expert validations required
 6. Adjusted predictions are sent back to the network
 
+## Feedback and Prediction Storage Flow
+
+### Overview
+The system implements a robust feedback-based prediction system that combines AI-powered forecasts with expert validations. Predictions are continuously refined through expert feedback and stored in a persistent database for historical tracking and analysis.
+
+### Components
+
+1. **Event Service**
+   - Manages events and their predictions
+   - Handles feedback processing
+   - Uses `ExpertFeedbackAdjuster` to calculate new probabilities
+   - Maintains prediction history and expert performance metrics
+
+2. **Expert Feedback System**
+   - Experts can agree or disagree with current predictions
+   - Dynamic expert weighting based on historical performance
+   - Feedback validation and anti-manipulation measures
+   - Expert reputation tracking and scoring
+
+3. **Prediction Storage**
+   - Predictions stored in PostgreSQL database
+   - Historical tracking of all prediction changes
+   - Expert feedback history and impact analysis
+   - Performance metrics and analytics
+
+### Flow
+
+1. Expert submits feedback through the frontend
+2. Feedback is sent to `/api/feedback` endpoint
+3. `EventService` processes the feedback:
+   - Validates expert credentials and reputation
+   - Checks for manipulation attempts
+   - Uses `ExpertFeedbackAdjuster` to calculate new probability
+   - Updates event's probability in database
+   - Records feedback and prediction change history
+4. Updated prediction is immediately available for display
+5. Expert performance metrics are updated
+
+### Technical Details
+
+- Feedback endpoint: `POST /api/feedback`
+- Required parameters:
+  - `event_id`: string
+  - `agrees`: boolean
+  - `expert_id`: string
+  - `comment`: string (optional)
+  - `confidence`: float (optional)
+
+- Response format:
+```json
+{
+  "success": boolean,
+  "message": string,
+  "timestamp": datetime,
+  "new_probability": float,
+  "expert_impact": float,
+  "prediction_history": array
+}
+```
+
+### Features
+
+- **Persistent Storage**
+  - All predictions stored in PostgreSQL
+  - Historical tracking of changes
+  - Expert performance metrics
+  - Event resolution tracking
+
+- **Expert System**
+  - Dynamic weight calculation
+  - Reputation scoring
+  - Feedback validation
+  - Anti-manipulation measures
+
+- **Analytics**
+  - Prediction accuracy tracking
+  - Expert performance analysis
+  - Market type specific metrics
+  - Historical trend analysis
+
+- **Security**
+  - Expert authentication
+  - Rate limiting
+  - IP-based restrictions
+  - Feedback validation
+
 

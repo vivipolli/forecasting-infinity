@@ -16,6 +16,8 @@ class EventService:
         self.logger = logger
         self.feedback_weight = feedback_weight
         self.events: List[MinerEvent] = []
+        self.prediction_history = {}  # Track prediction changes
+        self.expert_performance = {}  # Track expert performance
 
     async def refresh_events(self) -> List[MinerEvent]:
         try:
@@ -84,9 +86,6 @@ class EventService:
         expert_weight: float = 1.0,
         expert_id: str = None
     ):
-        """
-        Process expert feedback and adjust prediction using LLMForecaster
-        """
         try:
             self.logger.info(f"Processing feedback for event {event_id} from expert {expert_id}")
             
@@ -95,7 +94,8 @@ class EventService:
                 self.logger.error(f"Event {event_id} not found in service")
                 return False
             
-            self.logger.info(f"Current probability for event {event_id}: {event.probability}")
+            old_probability = event.probability
+            self.logger.info(f"Current probability for event {event_id}: {old_probability}")
             
             forecaster = LLMForecaster(
                 event=event,
@@ -105,7 +105,7 @@ class EventService:
             )
             
             new_prediction = await forecaster.adjust_with_feedback(
-                current_prediction=event.probability,
+                current_prediction=old_probability,
                 agrees=agrees,
                 expert_weight=expert_weight,
                 expert_id=expert_id,
@@ -113,6 +113,26 @@ class EventService:
             )
             
             self.logger.info(f"New prediction for event {event_id}: {new_prediction}")
+            
+            # Record prediction change
+            if event_id not in self.prediction_history:
+                self.prediction_history[event_id] = []
+            self.prediction_history[event_id].append({
+                "timestamp": datetime.now(),
+                "old_probability": old_probability,
+                "new_probability": new_prediction,
+                "expert_id": expert_id,
+                "expert_weight": expert_weight,
+                "agrees": agrees
+            })
+            
+            # Update expert performance
+            if expert_id not in self.expert_performance:
+                self.expert_performance[expert_id] = {
+                    "total_feedbacks": 0,
+                    "successful_feedbacks": 0
+                }
+            self.expert_performance[expert_id]["total_feedbacks"] += 1
             
             event.probability = new_prediction
             

@@ -53,7 +53,7 @@ export const EventCard: React.FC<EventCardProps> = ({
             )}
             
             <h3 className="text-lg font-bold text-white mb-1">
-              {description.split('?')[0] + '?'}
+              {description.split('?')[0].slice(0, 100) + (description.split('?')[0].length > 100 ? '...' : '') + '?'}
             </h3>
             
             <div className="relative">

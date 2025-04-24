@@ -1,7 +1,11 @@
+from datetime import datetime
+
 class ExpertFeedbackAdjuster:
     def __init__(self):
         self.max_adjustment = 0.3 
         self.max_feedbacks_per_expert = 1  # Limit feedbacks per expert per event
+        self.expert_history = {}  # Track expert performance
+        self.feedback_history = {}  # Track feedback history
         
     def adjust_prediction(
         self,
@@ -24,29 +28,40 @@ class ExpertFeedbackAdjuster:
         Returns:
             New adjusted probability
         """
+        # Validate expert
+        if not self._validate_expert(expert_id):
+            return current_prediction
+            
         # Check if expert has already given feedback for this event
         feedback_key = f"{expert_id}_{event_id}"
-        if hasattr(self, 'feedback_history') and feedback_key in self.feedback_history:
-            return current_prediction  # Expert already gave feedback, ignore
-            
-        # Initialize feedback history if not exists
-        if not hasattr(self, 'feedback_history'):
-            self.feedback_history = {}
+        if feedback_key in self.feedback_history:
+            return current_prediction
             
         # Record the feedback
-        self.feedback_history[feedback_key] = True
+        self.feedback_history[feedback_key] = {
+            "timestamp": datetime.now(),
+            "agrees": expert_agrees,
+            "weight": expert_weight,
+            "event_id": event_id
+        }
         
-        adjustment = 0.1 * expert_weight 
-        
+        # Calculate adjustment based on expert weight and history
+        base_adjustment = 0.1
+        expert_multiplier = self._calculate_expert_multiplier(expert_id)
+        adjustment = base_adjustment * expert_weight * expert_multiplier
         adjustment = min(adjustment, self.max_adjustment)
         
         if expert_agrees:
-            new_prediction = current_prediction + (
-                (1 - current_prediction) * adjustment
-            )
+            new_prediction = current_prediction + ((1 - current_prediction) * adjustment)
         else:
-            new_prediction = current_prediction - (
-                current_prediction * adjustment
-            )
+            new_prediction = current_prediction - (current_prediction * adjustment)
             
         return max(0.0, min(1.0, new_prediction))
+        
+    def _validate_expert(self, expert_id: str) -> bool:
+        # TODO: Implement expert validation (e.g., check against database)
+        return True
+        
+    def _calculate_expert_multiplier(self, expert_id: str) -> float:
+        # TODO: Implement expert performance calculation
+        return 1.0

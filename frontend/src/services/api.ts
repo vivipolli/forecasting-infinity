@@ -11,6 +11,17 @@ export interface Event {
   status: string;
 }
 
+export interface Prediction {
+  prediction: number;
+  timestamp: string;
+  expert_id?: string;
+}
+
+export interface EventPredictions {
+  count: number;
+  predictions: Prediction[];
+}
+
 export interface Feedback {
   event_id: string;
   agrees: boolean;
@@ -31,6 +42,16 @@ export const getEvents = async (): Promise<Event[]> => {
   } catch (error) {
     console.error('Error fetching events:', error);
     return [];
+  }
+};
+
+export const getPredictions = async (eventId: string): Promise<EventPredictions> => {
+  try {
+    const response = await axios.get(`${API_URL}/events/${eventId}/predictions`);
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching predictions:', error);
+    return { count: 0, predictions: [] };
   }
 };
 

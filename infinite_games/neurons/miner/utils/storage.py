@@ -13,6 +13,8 @@ SAVE_INTERVAL_SECONDS = 30  # 5 minutes
 class MinerStorage:
     def __init__(self, logger: InfiniteGamesLogger):
         self.cache: dict[str, MinerEvent] = {}
+        self.prediction_history: dict[str, list] = {}
+        self.expert_performance: dict[str, dict] = {}
         self.lock = Lock()
         self.logger = logger
 
@@ -27,9 +29,14 @@ class MinerStorage:
 
             async with self.lock:
                 for key, value in loaded.items():
-                    event: MinerEvent = MinerEvent.model_validate(value)
-                    if condition is None or condition(event):
-                        self.cache[key] = event
+                    if key == "prediction_history":
+                        self.prediction_history = value
+                    elif key == "expert_performance":
+                        self.expert_performance = value
+                    else:
+                        event: MinerEvent = MinerEvent.model_validate(value)
+                        if condition is None or condition(event):
+                            self.cache[key] = event
         except Exception:
             self.logger.warning("Fail to load cache file", exc_info=True)
 
@@ -44,7 +51,9 @@ class MinerStorage:
     async def _store(self):
         async with self.lock:
             serializable_cache = {
-                event_id: await event.to_dict() for event_id, event in self.cache.items()
+                "prediction_history": self.prediction_history,
+                "expert_performance": self.expert_performance,
+                **{event_id: await event.to_dict() for event_id, event in self.cache.items()}
             }
         with open(STORAGE_FILE, "w") as file:
             json.dump(serializable_cache, file, indent=2)
