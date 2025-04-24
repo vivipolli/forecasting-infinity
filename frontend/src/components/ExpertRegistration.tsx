@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useExpert } from '../contexts/ExpertContext';
 import { ExpertProfile } from '../types/expert';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 
 const EXPERTISE_OPTIONS = [
   'Crypto',
@@ -14,6 +14,8 @@ const EXPERTISE_OPTIONS = [
 
 export const ExpertRegistration: React.FC = () => {
   const { setExpertProfile } = useExpert();
+  const navigate = useNavigate();
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState<ExpertProfile>({
     name: '',
     email: '',
@@ -23,21 +25,30 @@ export const ExpertRegistration: React.FC = () => {
     experience: '',
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsSubmitting(true);
     
-    if (formData.experience.length < 300) {
-      alert('Please provide at least 300 characters about your experience');
-      return;
-    }
+    try {
+      if (formData.experience.length < 300) {
+        alert('Please provide at least 300 characters about your experience');
+        return;
+      }
 
-    const socialCount = Object.values(formData.socialProfiles).filter(Boolean).length;
-    if (socialCount < 2) {
-      alert('Please provide at least 2 social media profiles');
-      return;
-    }
+      const socialCount = Object.values(formData.socialProfiles).filter(Boolean).length;
+      if (socialCount < 2) {
+        alert('Please provide at least 2 social media profiles');
+        return;
+      }
 
-    setExpertProfile(formData);
+      setExpertProfile(formData);
+      navigate('/');
+    } catch (error) {
+      console.error('Error submitting form:', error);
+      alert('There was an error submitting your application. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleExpertiseChange = (expertise: string) => {
@@ -190,9 +201,12 @@ export const ExpertRegistration: React.FC = () => {
 
           <button
             type="submit"
-            className="w-full px-6 py-3 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
+            disabled={isSubmitting}
+            className={`w-full px-6 py-3 bg-primary text-white rounded-lg transition-colors ${
+              isSubmitting ? 'opacity-50 cursor-not-allowed' : 'hover:bg-primary/90'
+            }`}
           >
-            Submit Application
+            {isSubmitting ? 'Submitting...' : 'Submit Application'}
           </button>
         </form>
       </div>
