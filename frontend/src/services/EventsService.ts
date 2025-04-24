@@ -1,5 +1,3 @@
-import axios from 'axios';
-
 const BASE_URL = 'https://ifgames.win/api/v2';
 
 export interface Event {
@@ -19,16 +17,11 @@ export interface Event {
 export class EventsService {
   static async getOngoingEvents(limit: number = 25, offset: number = 0): Promise<Event[]> {
     try {
-      const response = await axios.get(`${BASE_URL}/events`, {
-        params: {
-          from_date: 1,
-          offset,
-          limit
-        }
-      });
-      return (response.data.items || []).map((event: any) => ({
+      const response = await fetch(`${BASE_URL}/events?from_date=1&offset=${offset}&limit=${limit}`);
+      const data = await response.json();
+      return (data.items || []).map((event: any) => ({
         ...event,
-        probability: event.probability || 0.5 // Default to 0.5 if not present
+        probability: event.probability || 0.5
       }));
     } catch (error) {
       console.error('Error fetching ongoing events:', error);
@@ -38,16 +31,11 @@ export class EventsService {
 
   static async getResolvedEvents(limit: number = 100, offset: number = 0): Promise<Event[]> {
     try {
-      const response = await axios.get(`${BASE_URL}/events/resolved`, {
-        params: {
-          offset,
-          resolved_since: 1,
-          limit
-        }
-      });
-      return (response.data.items || []).map((event: any) => ({
+      const response = await fetch(`${BASE_URL}/events/resolved?offset=${offset}&resolved_since=1&limit=${limit}`);
+      const data = await response.json();
+      return (data.items || []).map((event: any) => ({
         ...event,
-        probability: event.probability || 0.5 // Default to 0.5 if not present
+        probability: event.probability || 0.5
       }));
     } catch (error) {
       console.error('Error fetching resolved events:', error);
@@ -57,11 +45,12 @@ export class EventsService {
 
   static async getEventPredictions(eventId: string): Promise<{ predictions: any[] }> {
     try {
-      const response = await axios.get(`${BASE_URL}/events/${eventId}/predictions`);
+      const response = await fetch(`${BASE_URL}/events/${eventId}/predictions`);
+      const data = await response.json();
       return {
-        predictions: (response.data.predictions || []).map((pred: any) => ({
+        predictions: (data.predictions || []).map((pred: any) => ({
           ...pred,
-          prediction: pred.prediction || 0.5 // Default to 0.5 if not present
+          prediction: pred.prediction || 0.5
         }))
       };
     } catch (error) {
@@ -72,11 +61,18 @@ export class EventsService {
 
   static async submitFeedback(eventId: string, agrees: boolean, expertId: string): Promise<boolean> {
     try {
-      const response = await axios.post(`${BASE_URL}/events/${eventId}/feedback`, {
-        agrees,
-        expert_id: expertId
+      const response = await fetch(`${BASE_URL}/events/${eventId}/feedback`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          agrees,
+          expert_id: expertId
+        }),
       });
-      return response.data.success;
+      const data = await response.json();
+      return data.success;
     } catch (error) {
       console.error('Error submitting feedback:', error);
       return false;

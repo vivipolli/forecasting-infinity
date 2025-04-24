@@ -1,4 +1,3 @@
-import axios from 'axios';
 import { EventsService } from './EventsService';
 
 // Configuration
@@ -41,8 +40,8 @@ export const getEvents = async (): Promise<Event[]> => {
     if (USE_DIRECT_API) {
       return await EventsService.getOngoingEvents();
     }
-    const response = await axios.get(`${API_URL}/events`);
-    return response.data;
+    const response = await fetch(`${API_URL}/events`);
+    return await response.json();
   } catch (error) {
     console.error('Error fetching events:', error);
     return [];
@@ -58,8 +57,8 @@ export const getPredictions = async (eventId: string): Promise<EventPredictions>
         predictions: predictions.predictions
       };
     }
-    const response = await axios.get(`${API_URL}/events/${eventId}/predictions`);
-    return response.data;
+    const response = await fetch(`${API_URL}/events/${eventId}/predictions`);
+    return await response.json();
   } catch (error) {
     console.error('Error fetching predictions:', error);
     return { count: 0, predictions: [] };
@@ -67,8 +66,14 @@ export const getPredictions = async (eventId: string): Promise<EventPredictions>
 };
 
 export const predictEvent = async (eventId: string): Promise<Event> => {
-  const response = await axios.post(`${API_URL}/predict`, { event_id: eventId });
-  return response.data;
+  const response = await fetch(`${API_URL}/predict`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ event_id: eventId }),
+  });
+  return await response.json();
 };
 
 export const submitFeedback = async (feedback: Feedback): Promise<boolean> => {
@@ -85,8 +90,15 @@ export const submitFeedback = async (feedback: Feedback): Promise<boolean> => {
       );
     }
     
-    const response = await axios.post(`${API_URL}/feedback`, feedback);
-    return response.data.success;
+    const response = await fetch(`${API_URL}/feedback`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(feedback),
+    });
+    const data = await response.json();
+    return data.success;
   } catch (error) {
     console.error('Error submitting feedback:', error);
     throw error;
